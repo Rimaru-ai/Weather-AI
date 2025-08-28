@@ -1,8 +1,10 @@
 import requests
 import csv
 
+MY_KEY = "9bc1ca2570772439fcfa5174d5d4e716"
+
 # Replace with your OpenWeatherMap API key
-API_KEY = "8ff5709c094c9427d62769911dac84a5"
+API_KEY = MY_KEY
 
 # List of cities you want to track
 CITIES = ["Delhi", "Mumbai", "Kolkata", "Chennai"]
