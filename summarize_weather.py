@@ -1,32 +1,48 @@
+import os
 import pandas as pd
 
-def summarize_weather(input_file="weather.csv", output_file="weather_summary.csv"):
-    # Read the CSV into pandas
-    df = pd.read_csv(input_file)
+# --------------------------
+# Config
+# --------------------------
+RAW_DIR = "data/raw"
+PROCESSED_DIR = "data/processed"
+os.makedirs(PROCESSED_DIR, exist_ok=True)
 
-    # Convert datetime column to actual datetime
-    df["datetime"] = pd.to_datetime(df["datetime"])
 
-    # Extract just the date (not time)
-    df["date"] = df["datetime"].dt.date
+def summarize_city_weather(city: str):
+    """Summarize the weather data for a given city."""
+    filename = os.path.join(RAW_DIR, f"{city.lower()}_weather.csv")
+    
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"No raw weather data found for {city} at {filename}")
 
-    # Group by city + date
-    summary = df.groupby(["city", "date"]).agg(
-        avg_temp=("temp", "mean"),
-        min_temp=("temp", "min"),
-        max_temp=("temp", "max"),
-        avg_humidity=("humidity", "mean"),
-        weather_desc=("desc", lambda x: x.mode()[0] if not x.mode().empty else "N/A")
-    ).reset_index()
+    df = pd.read_csv(filename)
 
-    # Round numbers for readability
-    summary["avg_temp"] = summary["avg_temp"].round(1)
-    summary["avg_humidity"] = summary["avg_humidity"].round(1)
+    summary = {
+        "city": city,
+        "avg_temp": round(df["avg_temp"].mean(), 2),
+        "min_temp": round(df["min_temp"].min(), 2),
+        "max_temp": round(df["max_temp"].max(), 2),
+        "avg_humidity": round(df["avg_humidity"].mean(), 2),
+        "common_weather": df["weather_desc"].mode()[0] if not df["weather_desc"].mode().empty else "unknown"
+    }
 
-    # Save summary to CSV
-    summary.to_csv(output_file, index=False)
+    return summary
 
-    print(f"✅ Summary saved to {output_file}")
+
+def save_summary(city: str, summary: dict):
+    """Save summarized weather data into processed directory."""
+    filename = os.path.join(PROCESSED_DIR, f"{city.lower()}_summary.csv")
+    pd.DataFrame([summary]).to_csv(filename, index=False)
+    print(f"✅ Saved summary for {city} to {filename}")
+
 
 if __name__ == "__main__":
-    summarize_weather()
+    cities = ["Delhi", "Mumbai", "Chennai", "Kolkata"]
+
+    for city in cities:
+        try:
+            summary = summarize_city_weather(city)
+            save_summary(city, summary)
+        except Exception as e:
+            print(f"❌ Failed to summarize {city}: {e}")
