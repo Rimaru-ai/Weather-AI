@@ -1,31 +1,51 @@
+import os
 import pandas as pd
 
-def generate_reports(input_file="weather_summary.csv", output_file="weather_reports.txt"):
-    df = pd.read_csv(input_file)
+# --------------------------
+# Config
+# --------------------------
+PROCESSED_DIR = "data/processed"
+REPORTS_DIR = "data/reports"
+os.makedirs(REPORTS_DIR, exist_ok=True)
 
-    reports = []
-    for _, row in df.iterrows():
-        city = row["city"]
-        date = row["date"]
-        avg_temp = row["avg_temp"]
-        min_temp = row["min_temp"]
-        max_temp = row["max_temp"]
-        avg_humidity = row["avg_humidity"]
-        desc = row["weather_desc"]
 
-        report = (
-            f"📍 {city} on {date}: "
-            f"average temperature {avg_temp}°C (min {min_temp}°C, max {max_temp}°C), "
-            f"average humidity {avg_humidity}%. "
-            f"Weather is mostly {desc}."
-        )
-        reports.append(report)
+def generate_city_report(city: str):
+    """Generate a plain-text weather report for a city."""
+    filename = os.path.join(PROCESSED_DIR, f"{city.lower()}_summary.csv")
 
-    # Save to a text file
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(reports))
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"No summary data found for {city} at {filename}")
 
-    print(f"✅ Weather reports saved to {output_file}")
+    df = pd.read_csv(filename)
+    summary = df.iloc[0]  # Only one row per summary
+
+    report = (
+        f"Weather Report for {summary['city']}\n"
+        f"{'-'*40}\n"
+        f"Average Temperature: {summary['avg_temp']}°C\n"
+        f"Minimum Temperature: {summary['min_temp']}°C\n"
+        f"Maximum Temperature: {summary['max_temp']}°C\n"
+        f"Average Humidity: {summary['avg_humidity']}%\n"
+        f"Most Common Weather: {summary['common_weather']}\n"
+    )
+
+    return report
+
+
+def save_report(city: str, report: str):
+    """Save the report into reports directory."""
+    filename = os.path.join(REPORTS_DIR, f"{city.lower()}_report.txt")
+    with open(filename, "w") as f:
+        f.write(report)
+    print(f"✅ Saved report for {city} to {filename}")
+
 
 if __name__ == "__main__":
-    generate_reports()
+    cities = ["Delhi", "Mumbai", "Chennai", "Kolkata"]
+
+    for city in cities:
+        try:
+            report = generate_city_report(city)
+            save_report(city, report)
+        except Exception as e:
+            print(f"❌ Failed to generate report for {city}: {e}")
