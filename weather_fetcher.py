@@ -1,49 +1,78 @@
+import os
 import requests
-import csv
+import pandas as pd
+from datetime import datetime, timedelta
 
-MY_KEY = "9bc1ca2570772439fcfa5174d5d4e716"
+# --------------------------
+# Config
+# --------------------------
+API_URL = "https://api.openweathermap.org/data/2.5/forecast"
+API_KEY = os.getenv("OPENWEATHER_API_KEY", "")  # Read from env variable
+OUTPUT_DIR = "data/raw"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Replace with your OpenWeatherMap API key
-API_KEY = MY_KEY
 
-# List of cities you want to track
-CITIES = ["Delhi", "Mumbai", "Kolkata", "Chennai"]
+def fetch_weather(city: str, api_key: str = API_KEY):
+    """Fetch 5-day / 3-hour weather forecast data for a given city."""
+    if not api_key:
+        raise ValueError("API key not found. Please set OPENWEATHER_API_KEY environment variable.")
 
-def fetch_forecast(city):
-    """Fetch 5-day / 3-hour forecast data for a city."""
-    url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={API_KEY}&units=metric"
-    response = requests.get(url)
-    data = response.json()
+    params = {
+        "q": city,
+        "appid": api_key,
+        "units": "metric"
+    }
 
-    if response.status_code != 200 or "list" not in data:
-        print(f"❌ Error fetching data for {city}: {data.get('message', 'Unknown error')}")
-        return []
+    response = requests.get(API_URL, params=params)
+    response.raise_for_status()
+    return response.json()
 
-    forecasts = []
-    for item in data["list"]:  # Each entry = 3-hour forecast
-        forecasts.append({
+
+def process_weather_data(data: dict, city: str) -> pd.DataFrame:
+    """Convert raw API data into a cleaned DataFrame with daily averages."""
+    records = []
+    for entry in data["list"]:
+        date = entry["dt_txt"].split(" ")[0]
+        temp = entry["main"]["temp"]
+        humidity = entry["main"]["humidity"]
+        weather = entry["weather"][0]["description"]
+
+        records.append({
             "city": city,
-            "datetime": item["dt_txt"],
-            "temp": item["main"]["temp"],
-            "humidity": item["main"]["humidity"],
-            "desc": item["weather"][0]["description"]
+            "date": date,
+            "temp": temp,
+            "humidity": humidity,
+            "weather": weather
         })
-    return forecasts
 
-def save_to_csv(data, filename="weather.csv"):
-    """Save forecast data to a CSV file."""
-    with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["city", "datetime", "temp", "humidity", "desc"])
-        writer.writeheader()
-        writer.writerows(data)
+    df = pd.DataFrame(records)
+
+    # Aggregate by date
+    daily_summary = df.groupby(["city", "date"]).agg(
+        avg_temp=("temp", "mean"),
+        min_temp=("temp", "min"),
+        max_temp=("temp", "max"),
+        avg_humidity=("humidity", "mean"),
+        weather_desc=("weather", lambda x: x.mode()[0] if not x.mode().empty else "unknown")
+    ).reset_index()
+
+    return daily_summary
+
+
+def save_weather_data(df: pd.DataFrame, city: str):
+    """Save weather DataFrame as CSV in data/raw/ directory."""
+    filename = os.path.join(OUTPUT_DIR, f"{city.lower()}_weather.csv")
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved weather data for {city} to {filename}")
+
 
 if __name__ == "__main__":
-    all_data = []
-    for city in CITIES:
-        all_data.extend(fetch_forecast(city))
+    cities = ["Delhi", "Mumbai", "Chennai", "Kolkata"]
 
-    if all_data:
-        save_to_csv(all_data)
-        print("✅ Forecast data saved to weather.csv")
-    else:
-        print("⚠️ No data fetched.")
+    for city in cities:
+        try:
+            raw_data = fetch_weather(city)
+            df = process_weather_data(raw_data, city)
+            save_weather_data(df, city)
+        except Exception as e:
+            print(f"❌ Failed to fetch data for {city}: {e}")
