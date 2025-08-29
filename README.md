@@ -2,10 +2,10 @@
 # Weather RAG App 🌤️
 
 This project is a **Weather Retrieval-Augmented Generation (RAG)** system that:
-- Fetches weather forecasts using an API
-- Summarizes and stores them in CSV
-- Lets you query the data using LangChain + FAISS
-- Provides a simple Streamlit UI
+- Fetches weather forecasts using an API.
+- Summarizes and stores them in CSV.
+- Lets you query the data using LangChain + FAISS.
+- Provides a simple Streamlit UI.
 
 ## Setup
 
